@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수영 결승 스탑워치</title>
+<style>
+  :root {
+    --bg: #06182b; --panel: #0a2340; --line: #17406a; --text: #eaf6ff; --muted: #82a7c9;
+    --led: #ffb300; --gold: #ffd23f; --go: #1fbf6a; --stop: #e5484d; --btn: #173a5e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text);
+    background: radial-gradient(ellipse at 50% -10%, #12406a 0%, #06182b 60%) #06182b;
+    font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    display: flex; justify-content: center; padding: 24px 16px 40px;
+  }
+  .wrap { width: 100%; max-width: 900px; }
+  .eyebrow {
+    text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 3px;
+    color: var(--muted); margin-bottom: 14px;
+  }
+  .eyebrow b { color: var(--gold); }
+
+  /* ── 전광판 ── */
+  .board {
+    background: #020507; border: 2px solid #1c2733; border-radius: 14px;
+    padding: 14px 20px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5), inset 0 0 0 1px #0d1218;
+    font-family: "Consolas", "Courier New", monospace;
+  }
+  .board .side { font-size: 12px; line-height: 1.6; color: #6f8aa3; text-transform: uppercase; }
+  .board .side.right { text-align: right; }
+  .board .side .hl { color: var(--led); }
+  .clock {
+    font-size: clamp(34px, 9vw, 58px); font-weight: 700; color: var(--led);
+    font-variant-numeric: tabular-nums; letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(255,179,0,.55), 0 0 2px rgba(255,179,0,.9);
+  }
+  .split {
+    grid-column: 1 / -1; text-align: center; font-size: 14px; height: 20px;
+    color: #4ee38f; text-shadow: 0 0 8px rgba(78,227,143,.5);
+    opacity: 0; transition: opacity .25s;
+  }
+  .split.show { opacity: 1; }
+
+  /* ── 3D 무대 ── */
+  .stage {
+    position: relative; margin-top: 16px; border-radius: 14px; overflow: hidden;
+    border: 2px solid #1c3a58; box-shadow: 0 14px 40px rgba(0,0,0,.45); background: #0a1626;
+  }
+  .stage canvas { display: block; width: 100%; }
+  .caption {
+    position: absolute; left: 14px; bottom: 12px; padding: 6px 12px; border-radius: 6px;
+    background: rgba(2,8,16,.72); border-left: 3px solid var(--gold);
+    font-size: 13px; font-weight: 700; letter-spacing: .5px; pointer-events: none;
+    transition: opacity .3s;
+  }
+  .fallback { padding: 40px 20px; text-align: center; color: var(--muted); }
+  .stage .chip {
+    position: absolute; top: 12px; width: auto; height: auto; padding: 7px 12px; border-radius: 8px;
+    font-size: 12px; font-weight: 700; color: #fff; background: rgba(2,8,16,.72);
+    border: 1px solid rgba(255,255,255,.25); box-shadow: none;
+  }
+  .stage .chip:hover { background: rgba(2,8,16,.9); border-color: rgba(255,255,255,.6); }
+  .stage .chip:active { transform: none; }
+  .stage .chip:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  #skipBtn { left: 12px; }
+  #soundBtn { right: 12px; }
+  .tower {
+    position: absolute; top: 10px; left: 10px; min-width: 160px; pointer-events: none;
+    background: rgba(2,8,16,.78); border-radius: 8px; overflow: hidden;
+    font-size: 11px; font-variant-numeric: tabular-nums; display: none;
+  }
+  .tower.show { display: block; }
+  .tower .th { padding: 5px 10px; background: var(--gold); color: #111; font-weight: 800; letter-spacing: 1px; font-size: 11px; }
+  .tower .row { display: grid; grid-template-columns: 12px 12px 1fr auto; gap: 6px; align-items: center; padding: 3px 9px; border-top: 1px solid rgba(255,255,255,.08); }
+  .tower .row.me { background: rgba(255,210,63,.14); }
+  .tower .rk { font-weight: 800; color: var(--gold); }
+  .tower .cap { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,.4); }
+  .tower .gap { color: var(--muted); }
+  @media (max-width: 480px) {
+    .tower { min-width: 150px; font-size: 10px; }
+    .tower .row { padding: 3px 8px; }
+  }
+
+  /* ── 버튼 ── */
+  .buttons { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding: 0 8px; }
+  .buttons .hint { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.6; }
+  button {
+    width: 84px; height: 84px; padding: 0; border: none; border-radius: 50%;
+    font-size: 17px; font-weight: 700; cursor: pointer; color: #fff; background: var(--btn);
+    box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--btn);
+    transition: opacity .15s, transform .1s; font-family: inherit;
+  }
+  button:hover { opacity: .88; }
+  button:active { transform: scale(.96); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.start { background: var(--go); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--go); }
+  button.stop { background: var(--stop); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--stop); }
+
+  /* ── 구간 기록 ── */
+  .laps { margin-top: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .laps-head, .laps li { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 10px 18px; font-variant-numeric: tabular-nums; }
+  .laps-head { font-size: 11px; letter-spacing: 1.5px; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .laps ol { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+  .laps li { border-top: 1px solid rgba(23,64,106,.5); font-size: 15px; }
+  .laps li:first-child { border-top: none; }
+  .laps li span:nth-child(n+2), .laps-head span:nth-child(n+2) { text-align: right; }
+  .laps li .total { color: var(--muted); }
+  .laps li.best .t { color: #4ee38f; }
+  .laps li.worst .t { color: #ff7a7e; }
+  .laps .empty { padding: 18px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 480px) {
+    .board { grid-template-columns: 1fr; text-align: center; padding: 12px; }
+    .board .side, .board .side.right { text-align: center; }
+    .board .side br { display: none; }
+    button { width: 72px; height: 72px; font-size: 15px; }
+    .caption { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">AQUATICS CENTRE · <b>MEN'S 100M FREESTYLE FINAL</b></div>
+
+  <div class="board">
+    <div class="side">Lane <span class="hl">4</span><br>Pool 50M</div>
+    <div class="clock" id="clock">00:00.00</div>
+    <div class="side right">WR <span class="hl">46.40</span><br><span id="status" role="status" aria-live="polite">Walk-out</span></div>
+    <div class="split" id="split"></div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="caption" id="caption" aria-hidden="true">선수 입장</div>
+    <div class="tower" id="tower" aria-hidden="true"></div>
+    <button class="chip" id="skipBtn" type="button">입장 건너뛰기 ▸</button>
+    <button class="chip" id="soundBtn" type="button" aria-pressed="false">🔇 소리 켜기</button>
+  </div>
+
+  <div class="buttons">
+    <button id="lapBtn" disabled>구간</button>
+    <div class="hint">Space 출발/정지 · L 구간<br>R 초기화(입장부터) · Esc 입장 건너뛰기</div>
+    <button id="startBtn" class="start">출발</button>
+  </div>
+
+  <div class="laps">
+    <div class="laps-head"><span>구간</span><span>구간 기록</span><span>누적</span></div>
+    <ol id="laps"></ol>
+    <div class="empty" id="empty">출발한 뒤 구간 버튼을 누르면 기록이 남습니다</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ═════════ 시간 ═════════ */
+const clockEl = document.getElementById('clock');
+const splitEl = document.getElementById('split');
+const statusEl = document.getElementById('status');
+const captionEl = document.getElementById('caption');
+const startBtn = document.getElementById('startBtn');
+const lapBtn = document.getElementById('lapBtn');
+const lapsEl = document.getElementById('laps');
+const emptyEl = document.getElementById('empty');
+
+let running = false, startTime = 0, elapsed = 0;
+let laps = [], lastLapTotal = 0, splitTimer = null;
+let introStart = performance.now();
+
+const now = () => running ? elapsed + (performance.now() - startTime) : elapsed;
+const raceOn = () => running || elapsed > 0;
+const pad = n => String(n).padStart(2, '0');
+function fmt(ms) {
+  const m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60, cs = Math.floor(ms / 10) % 100;
+  return (m >= 60 ? Math.floor(m / 60) + ':' + pad(m % 60) : pad(m)) + ':' + pad(s) + '.' + pad(cs);
+}
+
+/* ═════════ 소리: 관중 함성, 심판 호루라기, 출발 신호 ═════════
+   브라우저는 사용자가 누르기 전에는 소리를 막으므로, 첫 클릭(소리 켜기·출발)에서 켠다 */
+const soundBtn = document.getElementById('soundBtn');
+const A = { ctx: null, master: null, crowd: null, on: false };
+function initAudio() {
+  if (A.ctx) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    A.ctx = ctx;
+    A.master = ctx.createGain(); A.master.gain.value = 0; A.master.connect(ctx.destination);
+    // 관중 소리: 갈색 잡음을 대역 통과 필터로 걸러 웅성거림을 만든다
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate), d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < d.length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 0.6;
+    A.crowd = ctx.createGain(); A.crowd.gain.value = 0.25;
+    src.connect(bp).connect(A.crowd).connect(A.master); src.start();
+  } catch (e) {}
+}
+function setSound(on) {
+  initAudio();
+  A.on = on;
+  if (A.ctx) { A.ctx.resume(); A.master.gain.setTargetAtTime(on ? 1 : 0, A.ctx.currentTime, 0.1); }
+  soundBtn.textContent = on ? '🔊 소리 끄기' : '🔇 소리 켜기';
+  soundBtn.setAttribute('aria-pressed', String(on));
+  if (!on && window.speechSynthesis) speechSynthesis.cancel();
+}
+function crowdLevel(v, secs = 0.8) { if (A.ctx) A.crowd.gain.setTargetAtTime(v, A.ctx.currentTime, secs / 3); }
+function beep(freq, dur, type = 'square', vol = 0.08) {
+  if (!A.ctx) return;
+  const ctx = A.ctx, o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+  o.connect(g).connect(A.master);
+  o.start(); o.stop(ctx.currentTime + dur);
+}
+function whistle(dur, at = 0) {
+  if (!A.ctx || !A.on) return;
+  const ctx = A.ctx, t0 = ctx.currentTime + at;
+  const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain();
+  o.type = 'triangle'; o.frequency.value = 2900;
+  lfo.frequency.value = 38; lg.gain.value = 140;          // 호루라기 속 구슬이 떠는 소리
+  lfo.connect(lg).connect(o.frequency);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.07, t0 + 0.03);
+  g.gain.setValueAtTime(0.07, t0 + dur - 0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(A.master);
+  o.start(t0); lfo.start(t0); o.stop(t0 + dur); lfo.stop(t0 + dur);
+}
+function say(text) {
+  if (!A.on || !window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-GB'; u.rate = 0.82; u.pitch = 0.8;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const ease = t => t * t * (3 - 2 * t);
+
+/* ═════════ 3D 장면 ═════════ */
+const stage = document.getElementById('stage');
+if (!window.THREE) {
+  stage.insertAdjacentHTML('afterbegin', '<div class="fallback">3D 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.</div>');
+}
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a1626);
+scene.fog = new THREE.Fog(0x0a1626, 45, 110);
+
+const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 300);
+const camPos = new THREE.Vector3(9, 2.6, -5), camLook = new THREE.Vector3(-2, 1.1, -5);
+camera.position.copy(camPos);
+
+function resize() {
+  const w = stage.clientWidth, h = Math.max(240, Math.round(w * 0.56));
+  renderer.setSize(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// 조명
+scene.add(new THREE.HemisphereLight(0xe6f2ff, 0x2a3a4a, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+sun.position.set(10, 30, -14);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 80 });
+sun.target.position.set(22, 0, 0);
+scene.add(sun, sun.target);
+
+function mesh(geo, mat, shadow = true) {
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = shadow; m.receiveShadow = true;
+  return m;
+}
+function labelTex(text, bg, fg, w = 128, h = 96, size = 64) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.fillStyle = fg; g.font = `800 ${size}px system-ui, sans-serif`;
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w / 2, h / 2 + 4);
+  return new THREE.CanvasTexture(c);
+}
+
+// 수영장: 길이 방향 x(0~50m), 레인 방향 z(-10~10m), 수면 y=0, 데크 y=0.3
+const DECK_Y = 0.3, POOL_DEPTH = 2;
+const laneZ = lane => (lane - 4.5) * 2.5;
+
+// 바닥 타일 + 레인 라인
+(function floor() {
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 820;
+  const g = c.getContext('2d'), sx = c.width / 50, sz = c.height / 20;
+  g.fillStyle = '#58c0e6'; g.fillRect(0, 0, c.width, c.height);
+  g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 1;
+  for (let x = 0; x <= 50; x += 0.5) { g.beginPath(); g.moveTo(x * sx, 0); g.lineTo(x * sx, c.height); g.stroke(); }
+  for (let z = 0; z <= 20; z += 0.5) { g.beginPath(); g.moveTo(0, z * sz); g.lineTo(c.width, z * sz); g.stroke(); }
+  g.fillStyle = '#0c2b52';
+  for (let i = 0; i < 8; i++) {
+    const zc = (1.25 + i * 2.5) * sz, w = 0.25 * sz;
+    g.fillRect(2 * sx, zc - w / 2, 46 * sx, w);
+    g.fillRect(2 * sx - w / 2, zc - sz * 0.5, w, sz);
+    g.fillRect(48 * sx - w / 2, zc - sz * 0.5, w, sz);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const f = mesh(new THREE.PlaneGeometry(50, 20), new THREE.MeshLambertMaterial({ map: tex }), false);
+  f.rotation.x = -Math.PI / 2; f.position.set(25, -POOL_DEPTH, 0);
+  scene.add(f);
+})();
+
+// 데크 (수영장 둘레)
+const deckMat = new THREE.MeshLambertMaterial({ color: 0xc9d3db });
+[[-9, 0, 18, 32], [59, 0, 18, 32], [25, -13, 50, 6], [25, 13, 50, 6]].forEach(([x, z, w, d]) => {
+  const b = mesh(new THREE.BoxGeometry(w, 0.6, d), deckMat, false);
+  b.position.set(x, DECK_Y - 0.3, z); scene.add(b);
+});
+// 수영장 벽 (타일)
+const wallMat = new THREE.MeshLambertMaterial({ color: 0x8fd3ee });
+[[0, 0, 0.1, 20], [50, 0, 0.1, 20], [25, -10, 50, 0.1], [25, 10, 50, 0.1]].forEach(([x, z, w, d]) => {
+  const b = mesh(new THREE.BoxGeometry(w, POOL_DEPTH + DECK_Y, d), wallMat, false);
+  b.position.set(x, (DECK_Y - POOL_DEPTH) / 2, z); scene.add(b);
+});
+// 터치패드
+for (let l = 1; l <= 8; l++) {
+  const p = mesh(new THREE.BoxGeometry(0.04, 0.9, 2.3), new THREE.MeshLambertMaterial({ color: 0x1b2430 }), false);
+  p.position.set(50 - 0.07, -0.2, laneZ(l)); scene.add(p);
+}
+
+// 물
+const waterGeo = new THREE.PlaneGeometry(50, 20, 120, 48);
+waterGeo.rotateX(-Math.PI / 2); waterGeo.translate(25, 0, 0);
+const water = new THREE.Mesh(waterGeo, new THREE.MeshPhongMaterial({
+  color: 0x1593c9, transparent: true, opacity: 0.68, shininess: 140, specular: 0xffffff,
+}));
+water.receiveShadow = true;
+scene.add(water);
+const wPos = waterGeo.attributes.position;
+
+// 레인 로프
+(function ropes() {
+  const per = 200, count = 9 * per;
+  const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshLambertMaterial(), count);
+  const m4 = new THREE.Matrix4(), col = new THREE.Color();
+  let n = 0;
+  for (let r = 0; r <= 8; r++) {
+    const z = -10 + r * 2.5;
+    for (let k = 0; k < per; k++, n++) {
+      const x = 0.12 + k * 0.25;
+      m4.makeTranslation(x, 0.05, z); im.setMatrixAt(n, m4);
+      const edge = x < 5 || x > 45, outer = r === 0 || r === 8;
+      col.set(edge ? 0xe5484d : outer ? 0xffd23f : (Math.floor(k / 3) % 2 ? 0xf2f2f2 : 0x1f5fd1));
+      im.setColorAt(n, col);
+    }
+  }
+  scene.add(im);
+})();
+
+// 출발대
+for (let l = 1; l <= 8; l++) {
+  const z = laneZ(l);
+  const blk = mesh(new THREE.BoxGeometry(0.6, 0.7, 0.65), new THREE.MeshLambertMaterial({ color: l === 4 ? 0xe8c23a : 0xe9eef2 }));
+  blk.position.set(-0.35, DECK_Y + 0.35, z); scene.add(blk);
+  const top = mesh(new THREE.BoxGeometry(0.62, 0.04, 0.67), new THREE.MeshLambertMaterial({ color: 0x24313d }));
+  top.position.set(-0.35, DECK_Y + 0.72, z); scene.add(top);
+  const num = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.32), new THREE.MeshBasicMaterial({
+    map: labelTex(String(l), l === 4 ? '#111' : '#0c2b52', l === 4 ? '#ffd23f' : '#fff'),
+  }));
+  num.rotation.y = Math.PI / 2; num.position.set(-0.04, DECK_Y + 0.42, z); scene.add(num);
+}
+
+// 관중석
+const crowd = (function stands() {
+  const standMat = new THREE.MeshLambertMaterial({ color: 0x1d2b3a });
+  const rows = 9;
+  for (let r = 0; r < rows; r++) {
+    const h = (r + 1) * 0.7;
+    const s = mesh(new THREE.BoxGeometry(66, h, 1.1), standMat, false);
+    s.position.set(25, DECK_Y + h / 2, 16.5 + r * 1.1); scene.add(s);
+  }
+  const palette = [0xe5484d, 0xffd23f, 0x1f6feb, 0xf5f5f5, 0x1fbf6a, 0xff8a00, 0x8b5cf6, 0x0ea5e9, 0x334155];
+  const seats = [];
+  for (let r = 0; r < rows; r++) for (let x = -6; x < 56; x += 0.55) {
+    if (Math.random() < 0.15) continue;
+    seats.push({ x: x + Math.random() * 0.1, y: DECK_Y + (r + 1) * 0.7 + 0.28, z: 16.5 + r * 1.1, ph: Math.random() * 6.28 });
+  }
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.55, 0.3), new THREE.MeshLambertMaterial(), seats.length);
+  const col = new THREE.Color();
+  seats.forEach((s, i) => im.setColorAt(i, col.set(palette[(Math.random() * palette.length) | 0])));
+  scene.add(im);
+  return { im, seats };
+})();
+const m4 = new THREE.Matrix4();
+function updateCrowd(t, cheer) {
+  crowd.seats.forEach((s, i) => {
+    const jump = cheer ? Math.max(0, Math.sin(t * 9 + s.ph)) * 0.22 : Math.sin(t * 1.5 + s.ph) * 0.01;
+    m4.makeTranslation(s.x, s.y + jump, s.z);
+    crowd.im.setMatrixAt(i, m4);
+  });
+  crowd.im.instanceMatrix.needsUpdate = true;
+}
+
+// 출발 쪽 벽과 조명 띠
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(40, 14), new THREE.MeshLambertMaterial({ color: 0x0d2a4a }));
+backWall.rotation.y = Math.PI / 2; backWall.position.set(-12, 7, 0); scene.add(backWall);
+const strip = new THREE.Mesh(new THREE.PlaneGeometry(40, 0.5), new THREE.MeshBasicMaterial({ color: 0x19c3ff }));
+strip.rotation.y = Math.PI / 2; strip.position.set(-11.95, 4, 0); scene.add(strip);
+for (let i = 0; i < 6; i++) {
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(6, 0.2, 0.6), new THREE.MeshBasicMaterial({ color: 0xfff6dd }));
+  lamp.position.set(2 + i * 9.5, 16, 0); scene.add(lamp);
+}
+
+// 세계 기록 라인
+const wrLine = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 20), new THREE.MeshBasicMaterial({ color: 0xffd23f }));
+wrLine.position.y = 0.08; scene.add(wrLine);
+const wrTag = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex('WR', '#ffd23f', '#111', 128, 64, 44) }));
+wrTag.scale.set(1.2, 0.6, 1); wrTag.position.set(0, 0.7, -10.6); scene.add(wrTag);
+
+/* ═════════ 물보라 입자 ═════════ */
+const PMAX = 1200;
+const pPos = new Float32Array(PMAX * 3).fill(-50), pVel = new Float32Array(PMAX * 3), pLife = new Float32Array(PMAX);
+let pIdx = 0;
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.11, transparent: true, opacity: 0.9 }));
+particles.frustumCulled = false;
+scene.add(particles);
+function spawn(x, y, z, vx, vy, vz, life) {
+  const i = pIdx; pIdx = (pIdx + 1) % PMAX;
+  pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = z;
+  pVel[i * 3] = vx; pVel[i * 3 + 1] = vy; pVel[i * 3 + 2] = vz; pLife[i] = life;
+}
+function burst(x, z, n, power) {
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random();
+    spawn(x + Math.cos(a) * 0.3, 0.05, z + Math.sin(a) * 0.3,
+      Math.cos(a) * r * 1.6, 1.5 + Math.random() * power, Math.sin(a) * r * 1.6, 1.4);
+  }
+}
+function updateParticles(dt) {
+  for (let i = 0; i < PMAX; i++) {
+    if (pLife[i] <= 0) continue;
+    pLife[i] -= dt;
+    pVel[i * 3 + 1] -= 9.8 * dt;
+    pPos[i * 3] += pVel[i * 3] * dt; pPos[i * 3 + 1] += pVel[i * 3 + 1] * dt; pPos[i * 3 + 2] += pVel[i * 3 + 2] * dt;
+    if ((pPos[i * 3 + 1] < 0 && pVel[i * 3 + 1] < 0) || pLife[i] <= 0) { pLife[i] = 0; pPos[i * 3 + 1] = -50; }
+  }
+  pGeo.attributes.position.needsUpdate = true;
+}
+function clearParticles() { pLife.fill(0); for (let i = 0; i < PMAX; i++) pPos[i * 3 + 1] = -50; }
+
+/* ═════════ 선수 ═════════ */
+// 선수 몸은 +x를 바라보고 서 있도록 만들고, 엉덩이(root)를 기준점으로 삼는다
+const HIP = 0.97;
+function makeSwimmer(cfg) {
+  const skin = new THREE.MeshStandardMaterial({ color: 0xd9a07c, roughness: 0.55 });
+  const suit = new THREE.MeshStandardMaterial({ color: cfg.suit, roughness: 0.35 });
+  const capM = new THREE.MeshStandardMaterial({ color: cfg.cap, roughness: 0.25 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.4 });
+
+  const root = new THREE.Group();
+  const pelvis = mesh(new THREE.CylinderGeometry(0.16, 0.15, 0.24, 14), suit);
+  root.add(pelvis);
+
+  const torso = new THREE.Group(); root.add(torso);
+  const chest = mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.6, 14), skin);
+  chest.position.y = 0.38; chest.scale.set(0.8, 1, 1.3); torso.add(chest);
+  const neck = mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.1, 8), skin);
+  neck.position.y = 0.72; torso.add(neck);
+  const head = mesh(new THREE.SphereGeometry(0.12, 16, 12), skin);
+  head.position.y = 0.85; torso.add(head);
+  const cap = mesh(new THREE.SphereGeometry(0.128, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), capM);
+  cap.position.y = 0.86; cap.rotation.z = -0.25; torso.add(cap);
+  const goggles = mesh(new THREE.BoxGeometry(0.05, 0.04, 0.2), dark);
+  goggles.position.set(0.1, 0.86, 0); torso.add(goggles);
+
+  function limb(parent, x, y, z, parts) {
+    const pivot = new THREE.Group(); pivot.position.set(x, y, z); parent.add(pivot);
+    parts.forEach(([geo, mat, py, px = 0]) => { const p = mesh(geo, mat); p.position.set(px, py, 0); pivot.add(p); });
+    return pivot;
+  }
+  const armGeo = new THREE.CylinderGeometry(0.055, 0.045, 0.62, 8);
+  const handGeo = new THREE.SphereGeometry(0.055, 8, 6);
+  const arms = [-1, 1].map(s => limb(torso, 0, 0.62, s * 0.27, [[armGeo, skin, -0.31], [handGeo, skin, -0.65]]));
+  const thigh = new THREE.CylinderGeometry(0.09, 0.075, 0.42, 10);
+  const shin = new THREE.CylinderGeometry(0.07, 0.05, 0.52, 8);
+  const foot = new THREE.BoxGeometry(0.22, 0.05, 0.08);
+  const legs = [-1, 1].map(s => limb(root, 0, -0.04, s * 0.09, [[thigh, suit, -0.21], [shin, skin, -0.66], [foot, skin, -0.93, 0.06]]));
+
+  scene.add(root);
+  return { ...cfg, root, torso, arms, legs, entered: false, lengths: 0 };
+}
+
+const swimmers = [
+  { lane: 3, name: '정하늘', cap: 0x1f6feb, suit: 0x0b2a6b, v: 2.05, react: 0.66, p: 0.7 },
+  { lane: 4, name: '이도윤', cap: 0xffd23f, suit: 0x111111, v: 2.12, react: 0.60, p: 2.1 },
+  { lane: 5, name: '박시우', cap: 0xe5484d, suit: 0x5b0f12, v: 2.08, react: 0.63, p: 4.0 },
+  { lane: 6, name: '최유준', cap: 0xf5f5f5, suit: 0x1f3b2a, v: 2.02, react: 0.69, p: 5.2 },
+].map(makeSwimmer);
+
+// 중계 화면처럼 머리 위에 레인 번호와 이름표를 띄운다 (입장~출발 전까지)
+swimmers.forEach(S => {
+  const c = document.createElement('canvas'); c.width = 320; c.height = 84;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(2,8,16,.85)'; g.fillRect(0, 0, 320, 84);
+  g.fillStyle = S.lane === 4 ? '#ffd23f' : '#19c3ff'; g.fillRect(0, 0, 84, 84);
+  g.fillStyle = '#111'; g.font = '800 54px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(S.lane, 42, 46);
+  g.fillStyle = '#fff'; g.font = '700 40px system-ui, "Malgun Gothic", sans-serif'; g.textAlign = 'left';
+  g.fillText(S.name, 104, 46);
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+  tag.scale.set(1.15, 0.3, 1); tag.renderOrder = 10;
+  scene.add(tag); S.tag = tag;
+  S.capHex = '#' + S.cap.toString(16).padStart(6, '0');
+});
+
+// 입수할 때 퍼지는 물결 고리
+const rings = [];
+function ring(x, z, size = 1) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.25, 0.4, 40),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, 0.06, z);
+  scene.add(m); rings.push({ m, life: 1, size });
+}
+function updateRings(dt) {
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const r = rings[i];
+    r.life -= dt * 0.7;
+    const s = 1 + (1 - r.life) * 7 * r.size;
+    r.m.scale.set(s, s, s); r.m.material.opacity = Math.max(0, r.life) * 0.7;
+    if (r.life <= 0) { scene.remove(r.m); r.m.geometry.dispose(); r.m.material.dispose(); rings.splice(i, 1); }
+  }
+}
+
+function pose(S, { bend = 0, aL = 0, aR = 0, lL = 0, lR = 0 }) {
+  S.torso.rotation.z = bend;
+  S.arms[0].rotation.z = aL; S.arms[1].rotation.z = aR;
+  S.legs[0].rotation.z = lL; S.legs[1].rotation.z = lR;
+}
+function place(S, x, y, z, rx = 0, ry = 0, rz = 0) {
+  S.root.position.set(x, y, z);
+  S.root.rotation.set(rx, ry, rz);
+}
+
+/* ── 입장 ~ 출발대 ── */
+const WALK = 1.7, STAGGER = 0.9, CLIMB = 0.8;
+const ENTRY = { x: -5, z: -15 };
+function introTimes(S, k) {
+  const z = laneZ(S.lane);
+  const t1 = Math.hypot(-3.2 - ENTRY.x, z - ENTRY.z) / WALK;
+  const t2 = t1 + 2.2 / WALK;
+  return { start: k * STAGGER, t1, t2, t3: t2 + CLIMB };
+}
+const ON_BLOCK_AT = Math.min(...swimmers.map((S, k) => { const t = introTimes(S, k); return t.start + t.t2; }));
+const MARKS_AT = Math.max(...swimmers.map((S, k) => { const t = introTimes(S, k); return t.start + t.t3; })) + 1.6;
+const MARKS_LEN = 0.8;
+const BLOCK_HIP = DECK_Y + 0.72 + HIP, MARK_HIP = BLOCK_HIP - 0.08;
+
+function walkTo(S, ax, az, bx, bz, f, t) {
+  const x = lerp(ax, bx, f), z = lerp(az, bz, f);
+  const ph = t * 7.5;
+  place(S, x, DECK_Y + HIP + Math.abs(Math.sin(ph)) * 0.035, z, 0, Math.atan2(-(bz - az), bx - ax), 0);
+  pose(S, { aL: 0.4 * Math.sin(ph), aR: -0.4 * Math.sin(ph), lL: -0.45 * Math.sin(ph), lR: 0.45 * Math.sin(ph) });
+}
+
+function intro(S, k, T) {
+  const z = laneZ(S.lane), tm = introTimes(S, k), t = T - tm.start;
+  S.root.visible = t >= 0;
+  if (t < 0) return;
+  if (t < tm.t1) return walkTo(S, ENTRY.x, ENTRY.z, -3.2, z, t / tm.t1, t);
+  if (t < tm.t2) return walkTo(S, -3.2, z, -1.0, z, (t - tm.t1) / (tm.t2 - tm.t1), t);
+  if (t < tm.t3) {                                 // 출발대에 오르기
+    const c = ease((t - tm.t2) / CLIMB);
+    place(S, lerp(-1.0, -0.32, c), lerp(DECK_Y + HIP, BLOCK_HIP, c) + Math.sin(Math.PI * c) * 0.15, z);
+    pose(S, { lL: Math.sin(Math.PI * c) * 1.0, lR: -Math.sin(Math.PI * c) * 0.2, aL: 0.3, aR: -0.3 });
+    return;
+  }
+  // 출발대 위에서 몸 풀기 → 테이크 유어 마크
+  const m = ease(clamp01((T - MARKS_AT) / MARKS_LEN));
+  const shake = (1 - m) * Math.sin((t - tm.t3) * 7 + k) * 0.25;
+  const swing = (1 - m) * Math.max(0, Math.sin((t - tm.t3) * 1.3 + k * 1.7)) * 2.2; // 가끔 팔을 크게 돌린다
+  place(S, -0.32, lerp(BLOCK_HIP, MARK_HIP, m), z);
+  pose(S, {
+    bend: lerp(0, -1.3, m),
+    aL: lerp(shake + swing, 1.25, m), aR: lerp(-shake + swing, 1.25, m),
+    lL: lerp(0, 0.18, m), lR: lerp(0, -0.38, m),
+  });
+}
+
+/* ── 출발 이후: 다이빙 → 잠영 → 자유형 ── */
+const DIVE = 0.9, GLIDE = 0.65;
+const toPoolX = m => 1.0 + m * 0.96;   // 머리가 벽을 뚫지 않게 엉덩이 위치를 살짝 안쪽으로
+function raceState(react, v, ph, t) {
+  if (t < react) return { phase: 'marks', prog: 0 };
+  const u = t - react;
+  if (u < DIVE) return { phase: 'dive', f: u / DIVE, prog: 4 * u / DIVE, x: lerp(-0.32, 4, u / DIVE) };
+  if (u < DIVE + GLIDE) {
+    const g = (u - DIVE) / GLIDE;
+    return { phase: 'glide', g, prog: lerp(4, 6.5, g), x: lerp(4, toPoolX(6.5), g) };
+  }
+  const s = u - DIVE - GLIDE;
+  const D = 6.5 + v * s + 0.12 * Math.sin(s * 1.3 + ph);
+  const m = D % 100, along = m <= 50 ? m : 100 - m;
+  return { phase: 'swim', D, s, prog: D, dir: m <= 50 ? 1 : -1, x: toPoolX(along) };
+}
+
+function race(S, t, live) {
+  const z = laneZ(S.lane), st = raceState(S.react, S.v, S.p, t);
+  S.root.visible = true;
+  if (st.phase === 'marks') {
+    place(S, -0.32, MARK_HIP, z);
+    pose(S, { bend: -1.3, aL: 1.25, aR: 1.25, lL: 0.18, lR: -0.38 });
+  } else if (st.phase === 'dive') {
+    const f = st.f, e = ease(clamp01(f * 4));
+    const rz = f < 0.25 ? lerp(0, -1.0, e) : lerp(-1.0, -2.15, ease((f - 0.25) / 0.75));
+    place(S, st.x, lerp(MARK_HIP, -0.4, f) + 1.5 * f * (1 - f), z, 0, 0, rz);
+    pose(S, { bend: lerp(-1.3, 0, e), aL: lerp(1.25, Math.PI, e), aR: lerp(1.25, Math.PI, e), lL: lerp(0.18, 0, e), lR: lerp(-0.38, 0, e) });
+  } else if (st.phase === 'glide') {
+    if (!S.entered) { S.entered = true; burst(4.2, z, 70, 3.2); ring(4.2, z, 1); }
+    const g = ease(st.g), kick = Math.sin(t * 14) * 0.2;
+    place(S, st.x, lerp(-0.45, -0.08, g), z, 0, 0, lerp(-2.15, -Math.PI / 2, g));
+    pose(S, { aL: Math.PI, aR: Math.PI, lL: kick, lR: -kick });
+  } else {
+    const ph = st.s * 5.4 + S.p, dir = st.dir;
+    place(S, st.x, -0.08, z, 0.35 * Math.sin(ph), dir > 0 ? 0 : Math.PI, -Math.PI / 2);
+    pose(S, {
+      aL: Math.PI - ph, aR: -ph,
+      lL: 0.28 * Math.sin(ph * 3), lR: -0.28 * Math.sin(ph * 3),
+    });
+    const lengths = Math.floor(st.D / 50);
+    if (lengths > S.lengths) {
+      S.lengths = lengths; burst(lengths % 2 ? 49.6 : 0.4, z, 30, 1.5); ring(lengths % 2 ? 49.6 : 0.4, z, 0.6);
+      if (S.lane === 4) { crowdLevel(0.9, 0.3); setTimeout(() => running && crowdLevel(0.55, 2), 1500); }
+    }
+    if (live) {
+      if (Math.random() < 0.7) spawn(st.x + dir * 0.75, 0.05, z + (Math.random() - 0.5) * 0.5, dir * 0.6, 0.8 + Math.random() * 1.2, (Math.random() - 0.5) * 0.6, 0.5);
+      if (Math.random() < 0.9) spawn(st.x - dir * 1.15, 0.05, z + (Math.random() - 0.5) * 0.3, -dir * 0.3 * Math.random(), 1 + Math.random() * 1.4, (Math.random() - 0.5) * 0.6, 0.5);
+    }
+  }
+  return st;
+}
+
+/* ═════════ 카메라 ═════════ */
+const tmpPos = new THREE.Vector3(), tmpLook = new THREE.Vector3();
+function cameraGoal(T, leaderX, leaderProg) {
+  if (!raceOn()) {
+    const f = ease(clamp01((T - (MARKS_AT - 3.5)) / 3.5));
+    tmpPos.set(lerp(9, 4.6, f), lerp(2.6, 2.2, f), lerp(-5, -6.2, f));
+    tmpLook.set(lerp(-2, -0.5, f), lerp(1.1, 1.4, f), lerp(-5, 0, f));
+  } else if (leaderProg < 7) {                       // 출발 직후: 옆에서 다이빙을 잡는다
+    tmpPos.set(2.5 + leaderX * 0.3, 2.2, -9.5);
+    tmpLook.set(leaderX + 0.5, 0.4, 0);
+  } else {                                           // 레이스: 선두를 따라가는 레일 카메라
+    tmpPos.set(leaderX - 2, 5.2, -12);
+    tmpLook.set(leaderX + 3, 0, 0.5);
+  }
+}
+
+/* ═════════ 중계 순위표 ═════════ */
+const tower = document.getElementById('tower');
+const skipBtn = document.getElementById('skipBtn');
+let lastTower = 0;
+let cues = {};
+let hundredMark = 0, flash = { text: '', until: 0 };
+function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
+function renderTower(states, leaderProg) {
+  if (leaderProg < 7) { tower.classList.remove('show'); return; }
+  const sorted = states.slice().sort((a, b) => b.st.prog - a.st.prog);
+  const lead = sorted[0];
+  tower.innerHTML = `<div class="th">${Math.min(100, Math.floor(lead.st.prog))}M · RANKING</div>` + sorted.map(({ S, st }, i) => {
+    const gap = i === 0 ? 'LEAD' : '+' + ((lead.st.prog - st.prog) / S.v).toFixed(2);
+    return `<div class="row${S.lane === 4 ? ' me' : ''}"><span class="rk">${i + 1}</span><span class="cap" style="background:${S.capHex}"></span><span>${S.lane} ${S.name}</span><span class="gap">${gap}</span></div>`;
+  }).join('');
+  tower.classList.add('show');
+}
+
+/* ═════════ 루프 ═════════ */
+let lastWall = performance.now();
+function frame(wall) {
+  const dt = Math.min(0.05, (wall - lastWall) / 1000); lastWall = wall;
+  const tw = wall / 1000;
+  const T = (wall - introStart) / 1000;
+  const t = now() / 1000;
+  clockEl.textContent = fmt(now());
+
+  // 물결
+  for (let i = 0; i < wPos.count; i++) {
+    const x = wPos.getX(i), z = wPos.getZ(i);
+    wPos.setY(i, 0.035 * Math.sin(x * 0.8 + tw * 1.6) + 0.025 * Math.sin(z * 1.2 - tw * 1.3) + 0.015 * Math.sin((x + z) * 2.4 + tw * 2.6));
+  }
+  wPos.needsUpdate = true;
+  waterGeo.computeVertexNormals();
+
+  let leaderX = 0, leaderProg = -1;
+  if (raceOn()) {
+    const states = swimmers.map(S => {
+      const st = race(S, t, running);
+      if (st.prog > leaderProg) { leaderProg = st.prog; leaderX = st.x ?? -0.3; }
+      S.tag.visible = false;
+      return { S, st };
+    });
+    const wr = raceState(0.6, 100 / 46.40, 0, t);
+    wrLine.visible = wrTag.visible = wr.phase !== 'marks';
+    wrLine.position.x = wrTag.position.x = wr.x ?? 0;
+    setText(statusEl, running ? 'Race' : 'Paused');
+    // 100m를 지날 때마다 중계 자막과 함성
+    const hundred = Math.floor(leaderProg / 100);
+    if (running && hundred > hundredMark) {
+      hundredMark = hundred;
+      const lead = states.reduce((a, b) => (b.st.prog > a.st.prog ? b : a));
+      flash = { text: `${hundred * 100}m 통과 · 1위 ${lead.S.lane}레인 ${lead.S.name} · ${fmt(now())}`, until: wall + 3500 };
+      crowdLevel(1, 0.3); setTimeout(() => running && crowdLevel(0.55, 2), 2000);
+    }
+    setText(captionEl, wall < flash.until ? flash.text
+      : leaderProg < 7 ? '출발!' : running ? `선두 ${Math.floor(leaderProg)}m` : '일시 정지');
+    if (wall - lastTower > 120) { lastTower = wall; renderTower(states, leaderProg); }
+    skipBtn.hidden = true;
+  } else {
+    swimmers.forEach((S, k) => {
+      intro(S, k, T);
+      S.tag.visible = S.root.visible && T < MARKS_AT + MARKS_LEN;
+      S.tag.position.set(S.root.position.x, S.root.position.y + 1.25, S.root.position.z);
+    });
+    wrLine.visible = wrTag.visible = false;
+    tower.classList.remove('show');
+    const marks = T >= MARKS_AT;
+    setText(statusEl, marks ? 'Take your marks' : 'Walk-out');
+    setText(captionEl, marks ? '테이크 유어 마크 · 출발을 누르세요' : T > ON_BLOCK_AT ? '출발대에 오르는 선수들' : '선수 입장');
+    skipBtn.hidden = T >= MARKS_AT;
+    // 심판 신호: 짧은 호루라기(입장) → 긴 호루라기(출발대로) → "Take your marks"
+    if (!cues.walk && T > 0.4) { cues.walk = true; whistle(0.18); whistle(0.18, 0.28); whistle(0.18, 0.56); }
+    if (!cues.block && T > ON_BLOCK_AT - 0.4) { cues.block = true; whistle(1.4); }
+    if (!cues.marks && T > MARKS_AT) { cues.marks = true; crowdLevel(0.05, 0.6); say('Take your marks'); }
+  }
+
+  cameraGoal(T, leaderX, leaderProg);
+  const k = 1 - Math.exp(-dt * 2.2);
+  camPos.lerp(tmpPos, k); camLook.lerp(tmpLook, k);
+  camera.position.copy(camPos); camera.lookAt(camLook);
+
+  updateCrowd(tw, running);
+  updateParticles(dt);
+  updateRings(dt);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ═════════ 조작 ═════════ */
+function toggle() {
+  if (running) {
+    elapsed += performance.now() - startTime;
+    running = false;
+    startBtn.textContent = '출발'; startBtn.className = 'start';
+    lapBtn.textContent = '초기화';
+    crowdLevel(0.2, 1);
+  } else {
+    if (!A.ctx && !soundTouched) setSound(true);    // 첫 출발에서 소리를 켠다 (직접 끈 적이 있으면 그대로 둔다)
+    if (elapsed === 0) {
+      // 입장 도중에 눌러도 바로 출발 자세로 맞춘다
+      const T = (performance.now() - introStart) / 1000;
+      if (T < MARKS_AT + MARKS_LEN) introStart = performance.now() - (MARKS_AT + MARKS_LEN) * 1000;
+      cues = { walk: true, block: true, marks: true };
+      if (window.speechSynthesis) speechSynthesis.cancel();
+      beep(1040, 0.5, 'square', 0.1);
+    }
+    crowdLevel(0.55, 1.2);
+    startTime = performance.now();
+    running = true;
+    startBtn.textContent = '정지'; startBtn.className = 'stop';
+    lapBtn.textContent = '구간'; lapBtn.disabled = false;
+  }
+}
+
+function lapOrReset() {
+  if (!running) return reset();
+  const total = now();
+  laps.push({ split: total - lastLapTotal, total });
+  lastLapTotal = total;
+  beep(1560, 0.08, 'sine', 0.12);
+  const st = raceState(swimmers[1].react, swimmers[1].v, swimmers[1].p, total / 1000);
+  if (st.x !== undefined) burst(st.x, laneZ(4), 25, 1.5);
+  splitEl.textContent = `SPLIT ${laps.length}   ${fmt(laps[laps.length - 1].split)}`;
+  splitEl.classList.add('show');
+  clearTimeout(splitTimer);
+  splitTimer = setTimeout(() => splitEl.classList.remove('show'), 3000);
+  renderLaps();
+}
+
+function reset() {
+  if (running) return;
+  elapsed = 0; laps = []; lastLapTotal = 0;
+  swimmers.forEach(S => { S.entered = false; S.lengths = 0; });
+  clearParticles();
+  introStart = performance.now();               // 입장 장면부터 다시
+  cues = {};
+  hundredMark = 0; flash.until = 0;
+  tower.classList.remove('show');
+  crowdLevel(0.25, 1);
+  lapBtn.textContent = '구간'; lapBtn.disabled = true;
+  splitEl.classList.remove('show');
+  renderLaps();
+}
+
+function renderLaps() {
+  lapsEl.innerHTML = '';
+  emptyEl.style.display = laps.length ? 'none' : 'block';
+  const splits = laps.map(l => l.split);
+  const min = laps.length > 1 ? Math.min(...splits) : null;
+  const max = laps.length > 1 ? Math.max(...splits) : null;
+  laps.forEach((l, i) => {
+    const li = document.createElement('li');
+    if (l.split === min) li.className = 'best';
+    else if (l.split === max) li.className = 'worst';
+    li.innerHTML = `<span>${i + 1}</span><span class="t">${fmt(l.split)}</span><span class="total">${fmt(l.total)}</span>`;
+    lapsEl.prepend(li);
+  });
+}
+
+let soundTouched = false;
+function skipIntro() {
+  if (raceOn()) return;
+  const T = (performance.now() - introStart) / 1000;
+  if (T >= MARKS_AT) return;
+  introStart = performance.now() - MARKS_AT * 1000;
+  cues.walk = cues.block = true;               // 건너뛴 구간의 호루라기는 울리지 않는다
+}
+startBtn.addEventListener('click', toggle);
+lapBtn.addEventListener('click', lapOrReset);
+skipBtn.addEventListener('click', () => { skipIntro(); startBtn.focus(); });
+soundBtn.addEventListener('click', () => { soundTouched = true; setSound(!A.on); });
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'BUTTON' && (e.code === 'Space' || e.key === 'Enter')) {
+    if (e.target !== startBtn && e.target !== lapBtn) return;  // 버튼 기본 동작과 겹치지 않게
+    e.preventDefault(); if (e.code === 'Space') toggle(); else e.target.click(); return;
+  }
+  if (e.key === 'Escape') skipIntro();
+  else if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  else if (e.key === 'l' || e.key === 'L') { if (running) lapOrReset(); }
+  else if (e.key === 'r' || e.key === 'R') reset();
+});
+</script>
+</body>
+</html>
