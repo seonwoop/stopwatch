@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>한 점의 고객</title>
+  <meta name="description" content="피자 프랜차이즈 9개 매장 실적 분석을 30초 점묘 키네틱 타이포그래피로 담은 모션 그래픽" />
+  <meta property="og:title" content="한 점의 고객" />
+  <meta property="og:description" content="성장은 가격이었고, 앱은 의존을 못 줄였고, 다음 위기는 사람이다." />
+  <meta property="og:image" content="poster.jpg" />
+  <style>
+    :root {
+      --ground: #eef1ec; --ink: #1f2a44; --muted: #4f6070; --line: #c9d3cf;
+      --c1: #34557a; --c2: #8e6fb8; --c3: #c8553d; --accent: #e8762b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --ground: #1c2236; --ink: #f6ebd4; --muted: #b7c0cf; --line: #34405c;
+              --c1: #9db8c9; --c2: #b7a3d3; --c3: #e07a5f; }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--ground); color: var(--ink);
+           font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+           line-height: 1.55; }
+    main { max-width: 1040px; margin: 0 auto; padding: 40px 16px 64px; }
+    .eyebrow { font-size: 14px; color: var(--muted); letter-spacing: .02em; }
+    h1 { font-size: clamp(30px, 6vw, 52px); letter-spacing: -0.03em; line-height: 1.15; margin: 6px 0 10px; }
+    h1 .dot { display: inline-block; width: .42em; height: .42em; border-radius: 50%;
+              background: var(--accent); vertical-align: .12em; margin-right: .18em; }
+    .lede { color: var(--muted); max-width: 640px; }
+    video { display: block; width: 100%; height: auto; margin: 28px 0 32px; border-radius: 6px;
+            background: #000; aspect-ratio: 16 / 9; }
+    ol { list-style: none; display: grid; gap: 0; border-top: 1px solid var(--line); }
+    li { display: grid; grid-template-columns: 56px 1fr; gap: 12px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+    li b { font-size: 28px; font-variant-numeric: tabular-nums; }
+    li:nth-child(1) b { color: var(--c1); } li:nth-child(2) b { color: var(--c2); } li:nth-child(3) b { color: var(--c3); }
+    li h2 { font-size: 19px; letter-spacing: -0.01em; }
+    li p { color: var(--muted); font-size: 15px; }
+    footer { margin-top: 28px; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">피자 프랜차이즈 9개 매장 · 2020–2026 실적 분석 · 30초</p>
+    <h1><span class="dot" aria-hidden="true"></span>한 점의 고객</h1>
+    <p class="lede">모네의 수련 연못을 점묘로 그린 화면에서 점들이 모였다 흩어지며 숫자가 됩니다. 소리를 켜고 보세요.</p>
+
+    <video controls playsinline preload="metadata" poster="poster.jpg">
+      <source src="one-dot-customer-30s.mp4" type="video/mp4" />
+      브라우저가 영상을 재생하지 못합니다. <a href="one-dot-customer-30s.mp4">MP4 내려받기</a>
+    </video>
+
+    <ol>
+      <li><b>①</b><div><h2>성장은 가격 효과였다</h2><p>주문 건수는 2022→2025년 −1.4%로 제자리, 객단가는 2.34만 → 2.99만원(+28%).</p></div></li>
+      <li><b>②</b><div><h2>자사앱이 커져도 배달앱 의존은 그대로</h2><p>자사앱 비중 5.6% → 31%, 외부 배달앱 주문은 매년 약 16만 건 그대로, 건당 수수료는 3,626원 → 4,927원(+36%).</p></div></li>
+      <li><b>③</b><div><h2>다음 위기는 사람</h2><p>인건비 비중 24.0% → 29.0%(+5.0%p), 매장 간 이익률 격차 2.6%p → 7.8%p(약 3배).</p></div></li>
+    </ol>
+    <footer>가상 데이터 기반 실습 결과물입니다. 화면·음악·효과음은 모두 코드로 생성했고, 내레이션은 합성 음성입니다.</footer>
+  </main>
+</body>
+</html>
